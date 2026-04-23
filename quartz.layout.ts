@@ -64,6 +64,7 @@ export const defaultContentPageLayout: PageLayout = {
         linkDistance: 15,
         fontSize: 1.0,
         opacityScale: 1,
+        showTags: false,
       },
     }),
     Component.DesktopOnly(Component.TableOfContents()),
