@@ -169,7 +169,7 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
     .force("charge", forceManyBody().strength(-100 * repelForce))
     .force("center", forceCenter().strength(centerForce))
     .force("link", forceLink(graphData.links).distance(linkDistance))
-    .force("collide", forceCollide<NodeData>((n) => nodeRadius(n)).iterations(3))
+    .force("collide", forceCollide<NodeData>((n) => nodeRadius(n) + 50).iterations(5))
 
   const radius = (Math.min(width, height) / 2) * 0.8
   if (enableRadial) simulation.force("radial", forceRadial(radius).strength(0.2))
@@ -195,21 +195,22 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
 
   // calculate color
   const color = (d: NodeData) => {
-    const isCurrent = d.id === slug
-    if (isCurrent) {
-      return computedStyleMap["--secondary"]
-    } else if (visited.has(d.id) || d.id.startsWith("tags/")) {
-      return computedStyleMap["--tertiary"]
-    } else {
-      return computedStyleMap["--gray"]
-    }
+    // 優先判斷資料夾分類，這裡的色碼對應你提供的截圖
+    if (d.id.includes("01_入門必修課")) return "#32c8ff" // 藍色
+    if (d.id.includes("02_準備畫布")) return "#00da7b"   // 綠色
+    if (d.id.includes("03_施工現場")) return "#ffaa00"   // 橘色
+    if (d.id.includes("04_大樓進化與包裝")) return "#b57dff" // 紫色
+
+    // 如果都不符合，才跑預設邏輯
+    if (d.id === slug) return computedStyleMap["--secondary"]
+    return computedStyleMap["--gray"]
   }
 
   function nodeRadius(d: NodeData) {
     const numLinks = graphData.links.filter(
       (l) => l.source.id === d.id || l.target.id === d.id,
     ).length
-    return 2 + Math.sqrt(numLinks)
+    return 6 + Math.sqrt(numLinks)*1.5
   }
 
   let hoveredNodeId: string | null = null
@@ -378,10 +379,10 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
       interactive: false,
       eventMode: "none",
       text: n.text,
-      alpha: 0,
-      anchor: { x: 0.5, y: 1.2 },
+      alpha: 1,
+      anchor: { x: 0.5, y: 1.5 },
       style: {
-        fontSize: fontSize * 15,
+        fontSize: fontSize * 16,
         fill: computedStyleMap["--dark"],
         fontFamily: computedStyleMap["--bodyFont"],
       },
@@ -514,11 +515,11 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
           let scaleOpacity = Math.max((scale - 1) / 3.75, 0)
           const activeNodes = nodeRenderData.filter((n) => n.active).flatMap((n) => n.label)
 
-          for (const label of labelsContainer.children) {
-            if (!activeNodes.includes(label)) {
-              label.alpha = scaleOpacity
-            }
-          }
+          //for (const label of labelsContainer.children) {
+            //if (!activeNodes.includes(label)) {
+              //label.alpha = scaleOpacity
+            //}
+          //}
         }),
     )
   }
@@ -537,11 +538,35 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
 
     for (const l of linkRenderData) {
       const linkData = l.simulationData
+      const sx = linkData.source.x! + width / 2
+      const sy = linkData.source.y! + height / 2
+      const tx = linkData.target.x! + width / 2
+      const ty = linkData.target.y! + height / 2
+
       l.gfx.clear()
-      l.gfx.moveTo(linkData.source.x! + width / 2, linkData.source.y! + height / 2)
-      l.gfx
-        .lineTo(linkData.target.x! + width / 2, linkData.target.y! + height / 2)
-        .stroke({ alpha: l.alpha, width: 1, color: l.color })
+      l.gfx.moveTo(sx, sy)
+      l.gfx.lineTo(tx, ty)
+      l.gfx.stroke({ alpha: l.alpha * 0.6, width: 1.5, color: l.color })
+
+      // --- 繪製箭頭開始 ---
+      const arrowSize = 6
+      const angle = Math.atan2(ty - sy, tx - sx)
+      // 讓箭頭停在圓點邊緣，而不是圓心 (扣掉半徑)
+      const offset = nodeRadius(linkData.target) + 2 
+      const arrowX = tx - offset * Math.cos(angle)
+      const arrowY = ty - offset * Math.sin(angle)
+
+      l.gfx.moveTo(arrowX, arrowY)
+      l.gfx.lineTo(
+        arrowX - arrowSize * Math.cos(angle - Math.PI / 6),
+        arrowY - arrowSize * Math.sin(angle - Math.PI / 6)
+      )
+      l.gfx.lineTo(
+        arrowX - arrowSize * Math.cos(angle + Math.PI / 6),
+        arrowY - arrowSize * Math.sin(angle + Math.PI / 6)
+      )
+      l.gfx.fill({ color: l.color, alpha: l.alpha * 0.8 })
+      // --- 繪製箭頭結束 ---
     }
 
     tweens.forEach((t) => t.update(time))
